@@ -1,0 +1,87 @@
+import logging
+import os
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+)
+
+# Логирование
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
+logger = logging.getLogger(__name__)
+
+# Токен из переменной окружения
+TOKEN = os.getenv("BOT_TOKEN")
+
+# Таймфреймы
+TIMEFRAMES = ["5s", "15s", "1m", "3m", "5m"]
+
+# Валютные пары (в одну строку)
+CURRENCY_PAIRS = [
+    "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD",
+    "NZDUSD", "USDCHF", "EURJPY", "GBPJPY", "EURGBP"
+]
+
+# Фейковый анализ (30 индикаторов + ИИ логика)
+def analyze_with_ai(symbol: str, timeframe: str) -> str:
+    # Здесь можно подключить TA-Lib, pandas-ta, TensorFlow и т.д.
+    reasons = [
+        "SMA: бычий сигнал",
+        "RSI: перепроданность",
+        "MACD: пересечение вверх",
+        "Стохастик: рост",
+        "Алигатор: тренд вверх",
+        "Фракталы: подтверждение",
+        "Parabolic SAR: покупка",
+    ]
+    # + ещё 23 индикатора по аналогии
+    decision = "BUY ✅" if "покупка" in reasons[-1] else "SELL 🔻"
+    return f"📊 {symbol} | {timeframe}\n" + "\n".join(reasons) + f"\n📌 Итог: {decision}"
+
+# /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton(pair, callback_data=f"pair:{pair}")]
+        for pair in CURRENCY_PAIRS
+    ]
+    await update.message.reply_text("Выбери валютную пару:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+# Обработка выбора валюты
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    if data.startswith("pair:"):
+        pair = data.split(":")[1]
+        keyboard = [
+            [InlineKeyboardButton(tf, callback_data=f"analyze:{pair}:{tf}")]
+            for tf in TIMEFRAMES
+        ]
+        await query.edit_message_text(
+            text=f"Выбрана пара {pair}. Теперь выбери таймфрейм:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+
+    elif data.startswith("analyze:"):
+        _, pair, tf = data.split(":")
+        result = analyze_with_ai(pair, tf)
+        await query.edit_message_text(text=result)
+
+# Запуск
+def main():
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_handler))
+
+    logger.info("Бот запущен 🚀")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
